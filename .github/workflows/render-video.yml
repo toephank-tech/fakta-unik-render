@@ -1,0 +1,139 @@
+# Render video (Remotion motion + ffmpeg assembly) on a free GitHub runner.
+#
+# Why this exists: the production VM's RAM is blocked by a host balloon
+# (~560 MB available of 8 GB), so the heavy steps (Remotion motion render +
+# ffmpeg assembly) cannot run there. A GitHub-hosted ubuntu-latest runner has
+# 7 GB RAM (conservative figure) and is free: 2,000 Actions minutes/month for
+# a private repo, unlimited for a public repo.
+#
+# The workflow downloads a materials zip from Google Drive (gdown), renders
+# the Remotion motion composition in chunks, pre-converts the AI clips,
+# assembles with the ffmpeg concat FILTER (never the concat demuxer for the
+# final assembly), burns ASS subtitles with the `ass` filter, QCs with
+# ffprobe, and uploads the finished MP4 as a workflow artifact.
+#
+# Trigger it from the VM with (see README.md for the full sequence):
+#   gh workflow run render-video.yml --repo OWNER/REPO \
+#     -f materials_file_id=<DRIVE_FILE_ID> -f slug=<slug> -f comp=<CompId> \
+#     -f duration=180 -f width=1920 -f height=1080 -f mode=full
+
+name: Render video (Remotion + ffmpeg)
+
+on:
+  workflow_dispatch:
+    inputs:
+      materials_file_id:
+        description: "Google Drive file ID of the materials zip (file must be shared: Anyone with the link can view)"
+        required: true
+        type: string
+      slug:
+        description: "Video slug, e.g. facts-37-trillion-cells (used for the artifact name)"
+        required: true
+        type: string
+      comp:
+        description: "Remotion composition ID, e.g. Facts37TrillionCellsMotion (must already be registered in remotion/src/Root.tsx)"
+        required: true
+        type: string
+      duration:
+        description: "Video duration in seconds (90 = Shorts, 180 = long-form)"
+        required: true
+        default: "180"
+        type: choice
+        options: ["90", "180"]
+      width:
+        description: "Output width in px (1080 for Shorts, 1920 for landscape)"
+        required: true
+        default: "1920"
+        type: string
+      height:
+        description: "Output height in px (1920 for Shorts, 1080 for landscape)"
+        required: true
+        default: "1080"
+        type: string
+      mode:
+        description: "smoke = first AI scene + first motion scene only (20s end-to-end test); full = whole video"
+        required: true
+        default: "full"
+        type: choice
+        options: ["full", "smoke"]
+      output:
+        description: "Output filename (optional; when empty, taken from config.json inside the materials zip)"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  render:
+    name: Render ${{ inputs.slug }} (${{ inputs.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: remotion/package-lock.json
+
+      - name: Install ffmpeg, fonts and Remotion browser deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg unzip fonts-dejavu-core fonts-liberation \
+            libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 \
+            libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2t64 \
+            libpango-1.0-0 libcairo2 libatspi2.0-0
+          # The motion comps use fontFamily "Arial, sans-serif"; Ubuntu has no
+          # Arial, so alias it to metric-compatible Liberation Sans.
+          sudo tee /etc/fonts/local.conf > /dev/null <<'EOF'
+          <?xml version="1.0"?>
+          <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+          <fontconfig>
+            <alias><family>Arial</family><prefer><family>Liberation Sans</family></prefer></alias>
+          </fontconfig>
+          EOF
+          sudo fc-cache -f > /dev/null
+          fc-match Arial
+          fc-match "DejaVu Sans:bold"
+
+      - name: Install gdown (Google Drive downloader)
+        run: python3 -m pip install --break-system-packages --quiet gdown
+
+      - name: Download materials from Google Drive
+        run: |
+          gdown --id "${{ inputs.materials_file_id }}" -O materials.zip
+          ls -la materials.zip
+          unzip -q materials.zip -d materials
+          find materials -type f | sort
+
+      - name: Install Remotion deps + headless Chrome
+        working-directory: remotion
+        run: |
+          npm ci --no-audit --no-fund
+          npx remotion browser ensure
+
+      - name: Render video
+        run: |
+          bash render/render_video.sh \
+            --workdir "$GITHUB_WORKSPACE/materials" \
+            --remotion-dir "$GITHUB_WORKSPACE/remotion" \
+            --comp "${{ inputs.comp }}" \
+            --slug "${{ inputs.slug }}" \
+            --duration "${{ inputs.duration }}" \
+            --width "${{ inputs.width }}" \
+            --height "${{ inputs.height }}" \
+            --mode "${{ inputs.mode }}" \
+            --output "${{ inputs.output }}" \
+            --outdir "$GITHUB_WORKSPACE/out"
+
+      - name: Upload finished MP4 + QC report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.slug }}-${{ inputs.mode }}
+          path: |
+            out/*.mp4
+            out/qc_report.txt
+          if-no-files-found: error
+          retention-days: 7

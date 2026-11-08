@@ -1,0 +1,7 @@
+# Build outputs / runtime dirs (never committed)
+node_modules/
+out/
+materials/
+materials.zip
+*.log
+.DS_Store
