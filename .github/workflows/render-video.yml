@@ -36,11 +36,11 @@ on:
         default: "none"
         type: string
       duration:
-        description: "Video duration in seconds (90 = Shorts, 180 = long-form)"
+        description: "Video duration in seconds (90 = Shorts, 150 = kids long-form, 180 = long-form)"
         required: true
         default: "180"
         type: choice
-        options: ["90", "180"]
+        options: ["90", "150", "180"]
       width:
         description: "Output width in px (1080 for Shorts, 1920 for landscape)"
         required: true
