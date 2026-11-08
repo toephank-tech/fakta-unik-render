@@ -63,6 +63,7 @@ import { FactsThoughts6200Motion } from "./FactsThoughts6200Motion";
 import { FactsDna2MetresMotion } from "./FactsDna2MetresMotion";
 import { Facts37TrillionCellsMotion } from "./Facts37TrillionCellsMotion";
 import { FactsHeartLongMotion } from "./FactsHeartLongMotion";
+import { FactsGlymphaticLongMotion } from "./FactsGlymphaticLongMotion";
 import { KidsMiloShare } from "./KidsMiloShare";
 import { Logo } from "./HelloWorld/Logo";
 import { Title } from "./HelloWorld/Title";
@@ -493,6 +494,14 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="FactsHeartLongMotion"
         component={FactsHeartLongMotion}
+        durationInFrames={2700}
+        fps={30}
+        width={1920}
+        height={1080}
+      />
+      <Composition
+        id="FactsGlymphaticLongMotion"
+        component={FactsGlymphaticLongMotion}
         durationInFrames={2700}
         fps={30}
         width={1920}
