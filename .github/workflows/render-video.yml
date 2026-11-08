@@ -103,7 +103,7 @@ jobs:
 
       - name: Download materials from Google Drive
         run: |
-          gdown --id "${{ inputs.materials_file_id }}" -O materials.zip
+          gdown "${{ inputs.materials_file_id }}" -O materials.zip
           ls -la materials.zip
           unzip -q materials.zip -d materials
           find materials -type f | sort
