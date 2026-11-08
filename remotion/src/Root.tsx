@@ -69,6 +69,7 @@ import { FactsSleepMemoryLongMotion } from "./FactsSleepMemoryLongMotion";
 import { FactsLessSleepHungrierLongMotion } from "./FactsLessSleepHungrierLongMotion";
 import { FactsPoorSleepImmunityLongMotion } from "./FactsPoorSleepImmunityLongMotion";
 import { FactsBrain13msLongMotion } from "./FactsBrain13msLongMotion";
+import { FactsBrainMemoryPetabytesLongMotion } from "./FactsBrainMemoryPetabytesLongMotion";
 import { KidsMiloShare } from "./KidsMiloShare";
 import { Logo } from "./HelloWorld/Logo";
 import { Title } from "./HelloWorld/Title";
@@ -547,6 +548,14 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="FactsBrain13msLongMotion"
         component={FactsBrain13msLongMotion}
+        durationInFrames={2700}
+        fps={30}
+        width={1920}
+        height={1080}
+      />
+      <Composition
+        id="FactsBrainMemoryPetabytesLongMotion"
+        component={FactsBrainMemoryPetabytesLongMotion}
         durationInFrames={2700}
         fps={30}
         width={1920}
