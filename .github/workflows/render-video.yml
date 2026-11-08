@@ -31,8 +31,9 @@ on:
         required: true
         type: string
       comp:
-        description: "Remotion composition ID, e.g. Facts37TrillionCellsMotion (must already be registered in remotion/src/Root.tsx)"
-        required: true
+        description: "Remotion composition ID, e.g. Facts37TrillionCellsMotion (must already be registered in remotion/src/Root.tsx). Use 'none' for full-AI videos (no motion scenes — the Remotion render is skipped)."
+        required: false
+        default: "none"
         type: string
       duration:
         description: "Video duration in seconds (90 = Shorts, 180 = long-form)"
@@ -51,7 +52,7 @@ on:
         default: "1080"
         type: string
       mode:
-        description: "smoke = first AI scene + first motion scene only (20s end-to-end test); full = whole video"
+        description: "smoke = first AI scene + first motion scene only (20s end-to-end test; full-AI videos: first two AI scenes); full = whole video"
         required: true
         default: "full"
         type: choice

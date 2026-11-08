@@ -47,9 +47,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-for v in WORKDIR REMOTION_DIR COMP SLUG DURATION WIDTH HEIGHT OUTDIR; do
+for v in WORKDIR REMOTION_DIR SLUG DURATION WIDTH HEIGHT OUTDIR; do
   if [[ -z "${!v}" ]]; then echo "ERROR: --$(echo "$v" | tr 'A-Z_' 'a-z-') is required" >&2; exit 2; fi
 done
+# COMP is optional: full-AI videos have no Remotion comp — pass --comp none
+# (or omit it) and the Remotion render step is skipped entirely.
+[[ -z "$COMP" ]] && COMP="none"
 [[ "$MODE" == "full" || "$MODE" == "smoke" ]] || { echo "ERROR: --mode must be full|smoke" >&2; exit 2; }
 
 BUILD="$OUTDIR/build"
@@ -137,20 +140,32 @@ log "config OK: $CFG_SCENE_COUNT scenes, audio=$CFG_AUDIO, subs=$CFG_SUBS, outpu
 # ---------------- choose the scenes to render ----------------
 # Full mode: every scene. Smoke mode: first AI scene + first motion scene
 # (in config order) = 20 s end-to-end, proving Remotion + ffmpeg + ass burn.
+# Full-AI videos have no motion scenes, so smoke renders the first TWO AI
+# scenes instead (still 20 s, still proving ffmpeg + ass burn + audio mux).
 SCENE_LIST="$CFG_SCENES"
 EXPECTED_DURATION="$DURATION"
 if [[ "$MODE" == "smoke" ]]; then
-  FIRST_AI=""; FIRST_MOTION=""
+  FIRST_AI=""; SECOND_AI=""; FIRST_MOTION=""
   for entry in $CFG_SCENES; do
     n="${entry%%:*}"; rest="${entry#*:}"; type="${rest%%:*}"
-    if [[ "$type" == "ai" && -z "$FIRST_AI" ]]; then FIRST_AI="$entry"; fi
+    if [[ "$type" == "ai" ]]; then
+      if [[ -z "$FIRST_AI" ]]; then FIRST_AI="$entry";
+      elif [[ -z "$SECOND_AI" ]]; then SECOND_AI="$entry"; fi
+    fi
     if [[ "$type" == "motion" && -z "$FIRST_MOTION" ]]; then FIRST_MOTION="$entry"; fi
   done
-  [[ -n "$FIRST_AI" && -n "$FIRST_MOTION" ]] \
-    || fail "smoke mode needs at least one AI scene and one motion scene in config.json"
-  # keep config order: the earlier scene first
-  n_ai="${FIRST_AI%%:*}"; n_mo="${FIRST_MOTION%%:*}"
-  if (( n_ai < n_mo )); then SCENE_LIST="$FIRST_AI $FIRST_MOTION"; else SCENE_LIST="$FIRST_MOTION $FIRST_AI"; fi
+  if [[ -n "$FIRST_MOTION" ]]; then
+    # V3 combo: first AI scene + first motion scene (20s), config order kept.
+    [[ -n "$FIRST_AI" && -n "$FIRST_MOTION" ]] \
+      || fail "smoke mode needs at least one AI scene and one motion scene in config.json"
+    n_ai="${FIRST_AI%%:*}"; n_mo="${FIRST_MOTION%%:*}"
+    if (( n_ai < n_mo )); then SCENE_LIST="$FIRST_AI $FIRST_MOTION"; else SCENE_LIST="$FIRST_MOTION $FIRST_AI"; fi
+  else
+    # Full-AI video (no motion scenes): first TWO AI scenes (20s).
+    [[ -n "$FIRST_AI" && -n "$SECOND_AI" ]] \
+      || fail "smoke mode needs at least two AI scenes in config.json"
+    SCENE_LIST="$FIRST_AI $SECOND_AI"
+  fi
   EXPECTED_DURATION=20
   log "smoke mode: rendering scenes [$SCENE_LIST] only (20s)"
 fi
